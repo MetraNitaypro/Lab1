@@ -35,6 +35,15 @@ AesCipherParams CreateChiperParamsFromPassword(std::string_view password) {
 
 int main(int argc, char *argv[]) {
     try {
+        CryptoGuard::ProgramOptions pr;
+        pr.Parse(argc, argv);
+
+    } catch (const std::exception &e) {
+        std::print(std::cerr, "Error: {}\n", e.what());
+        return 1;
+    }
+
+    try {
         //
         // OpenSSL пример использования:
         //
