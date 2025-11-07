@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
 
         CryptoGuard::ProgramOptions pr;
         pr.Parse(argc, argv);
+        std::print("{}", argc);
 
         auto input_file = pr.GetInputFile();
         auto output_file = pr.GetOutputFile();
@@ -78,6 +79,19 @@ int main(int argc, char *argv[]) {
         // Обрабатываем первые N символов
         std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
         EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        // Обрабатываем оставшиеся символы
+        std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
+        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        // Заканчиваем работу с cipher
+        EVP_CipherFinal_ex(ctx, outBuf.data(), &outLen);
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }

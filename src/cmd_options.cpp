@@ -62,6 +62,7 @@ void ProgramOptions::Parse(int argc, char *argv[]) {
 
     } catch (const po::error &e) {
         std::cerr << "Error: " << e.what() << "\n";
+        std::cout << desc_ << std::endl;
         throw(e);
         return;
     }
