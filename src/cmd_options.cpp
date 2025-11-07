@@ -8,11 +8,12 @@ namespace CryptoGuard {
 namespace po = boost::program_options;
 
 ProgramOptions::ProgramOptions() : desc_("Allowed options") {
-    desc_.add_options()("help", "выводит справочное сообщение")("command", po::value<std::string>(),
-                                                                "команда encrypt, decrypt или checksum")(
-        "input", po::value<std::string>()->required(), "путь до входного файла")(
-        "output", po::value<std::string>()->required(), "путь до файла, в котором будет сохранён результат")(
-        "password", po::value<std::string>()->required(), "пароль для шифрования и дешифрования");
+    desc_.add_options()("help", "выводит справочное сообщение")(
+        "command", po::value<std::string>()->default_value("encrypt"), "команда encrypt, decrypt или checksum")(
+        "input,i", po::value<std::string>()->default_value("input.txt"),
+        "путь до входного файла")("output,o", po::value<std::string>()->default_value("output.txt"),
+                                  "путь до файла, в котором будет сохранён результат")(
+        "password,p", po::value<std::string>()->default_value("pass"), "пароль для шифрования и дешифрования");
 }
 
 ProgramOptions::~ProgramOptions() = default;
@@ -31,7 +32,6 @@ void ProgramOptions::Parse(int argc, char *argv[]) {
             auto com = vm["command"].as<std::string>();
             auto it = commandMapping_.find(com);
             if (it == commandMapping_.end()) {
-                // std::cout << "Ошибка: неизвестная команда" << std::endl;
                 po::error er("Ошибка: неизвестная команда");
                 throw(er);
                 return;
@@ -42,9 +42,8 @@ void ProgramOptions::Parse(int argc, char *argv[]) {
         if (vm.count("input")) {
             inputFile_ = vm["input"].as<std::string>();
             if (std::filesystem::exists(inputFile_)) {
-                std::cout << "Файл существует" << std::endl;
+                std::print("Файл существует\n");
             } else {
-                // std::cout << "Файл не существует" << std::endl;
                 po::error er("Входного файла не существует");
                 throw(er);
             }
@@ -52,7 +51,6 @@ void ProgramOptions::Parse(int argc, char *argv[]) {
         if (vm.count("output")) {
             outputFile_ = vm["output"].as<std::string>();
             if (outputFile_.empty()) {
-                // std::cout << "Укажите непустое название входного файла" << std::endl;
                 po::error er("Укажите непустое название входного файла");
                 throw(er);
             }
