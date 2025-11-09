@@ -1,4 +1,174 @@
+#include "crypto_guard_ctx.h"
+#include <vector>
+
+#include <algorithm>
+#include <array>
+#include <fstream>
+#include <iostream>
+#include <openssl/evp.h>
+#include <print>
+#include <stdexcept>
+#include <string>
 
 namespace CryptoGuard {
+
+class CryptoGuardCtx::Impl {
+private:
+    struct AesCipherParams {
+        static const size_t KEY_SIZE = 32;             // AES-256 key size
+        static const size_t IV_SIZE = 16;              // AES block size (IV length)
+        const EVP_CIPHER *cipher = EVP_aes_256_cbc();  // Cipher algorithm
+
+        int encrypt;                              // 1 for encryption, 0 for decryption
+        std::array<unsigned char, KEY_SIZE> key;  // Encryption key
+        std::array<unsigned char, IV_SIZE> iv;    // Initialization vector
+    };
+
+    AesCipherParams CreateChiperParamsFromPassword(std::string_view password) {
+        AesCipherParams params;
+        constexpr std::array<unsigned char, 8> salt = {'1', '2', '3', '4', '5', '6', '7', '8'};
+
+        int result = EVP_BytesToKey(params.cipher, EVP_sha256(), salt.data(),
+                                    reinterpret_cast<const unsigned char *>(password.data()), password.size(), 1,
+                                    params.key.data(), params.iv.data());
+
+        if (result == 0) {
+            throw std::runtime_error{"Failed to create a key from password"};
+        }
+
+        return params;
+    }
+
+public:
+    Impl() {}
+    ~Impl() {}
+    void EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
+        //
+        // OpenSSL пример использования:
+        //
+
+        if (!inStream.good()) {
+            throw std::runtime_error("Ошибка входного потока");
+        }
+        if (!outStream.good()) {
+            throw std::runtime_error("Ошибка выходного потока");
+        }
+
+        std::string output;
+        // Чтение всех данных из inStream
+        std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
+
+        std::print("Входные данные: {}", input);
+
+        OpenSSL_add_all_algorithms();
+
+        auto params = CreateChiperParamsFromPassword(password);
+        params.encrypt = 1;
+        auto *ctx = EVP_CIPHER_CTX_new();
+
+        // Инициализируем cipher
+        EVP_CipherInit_ex(ctx, params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
+
+        std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
+        std::vector<unsigned char> inBuf(16);
+        int outLen;
+        // Обрабатываем первые N символов
+        std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
+        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        // Обрабатываем оставшиеся символы
+        std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
+        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        // Заканчиваем работу с cipher
+        EVP_CipherFinal_ex(ctx, outBuf.data(), &outLen);
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        EVP_CIPHER_CTX_free(ctx);
+
+        outStream << output;
+
+        std::print("String encoded successfully. Result: '{}'\n\n", output);
+        EVP_cleanup();
+    }
+    void DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
+        //
+        // OpenSSL пример использования:
+        //
+
+        if (!inStream.good()) {
+            throw std::runtime_error("Ошибка входного потока");
+        }
+        if (!outStream.good()) {
+            throw std::runtime_error("Ошибка выходного потока");
+        }
+
+        std::string output;
+        // Чтение всех данных из inStream
+        std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
+
+        std::print("Входные данные: {}", input);
+
+        OpenSSL_add_all_algorithms();
+
+        auto params = CreateChiperParamsFromPassword(password);
+        params.encrypt = 0;
+        auto *ctx = EVP_CIPHER_CTX_new();
+
+        // Инициализируем cipher
+        EVP_CipherInit_ex(ctx, params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
+
+        std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
+        std::vector<unsigned char> inBuf(16);
+        int outLen;
+        // Обрабатываем первые N символов
+        std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
+        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        // Обрабатываем оставшиеся символы
+        std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
+        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        // Заканчиваем работу с cipher
+        EVP_CipherFinal_ex(ctx, outBuf.data(), &outLen);
+        for (int i = 0; i < outLen; ++i) {
+            output.push_back(outBuf[i]);
+        }
+
+        EVP_CIPHER_CTX_free(ctx);
+
+        outStream << output;
+
+        std::print("String encoded successfully. Result: '{}'\n\n", output);
+        EVP_cleanup();
+    }
+    std::string CalculateChecksum(std::iostream &inStream) {}
+};
+
+CryptoGuardCtx::CryptoGuardCtx() {}
+CryptoGuardCtx::~CryptoGuardCtx() {}
+
+// API
+void CryptoGuardCtx::EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
+    pImpl_->EncryptFile(inStream, outStream, password);
+}
+void CryptoGuardCtx::DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
+    pImpl_->DecryptFile(inStream, outStream, password);
+}
+std::string CryptoGuardCtx::CalculateChecksum(std::iostream &inStream) { return pImpl_->CalculateChecksum(inStream); }
 
 }  // namespace CryptoGuard
