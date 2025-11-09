@@ -43,9 +43,6 @@ public:
     Impl() {}
     ~Impl() {}
     void EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
-        //
-        // OpenSSL пример использования:
-        //
 
         if (!inStream.good()) {
             throw std::runtime_error("Ошибка входного потока");
@@ -59,8 +56,6 @@ public:
         std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
 
         std::print("Входные данные: {}", input);
-
-        OpenSSL_add_all_algorithms();
 
         auto params = CreateChiperParamsFromPassword(password);
         params.encrypt = 1;
@@ -97,12 +92,8 @@ public:
         outStream << output;
 
         std::print("String encoded successfully. Result: '{}'\n\n", output);
-        EVP_cleanup();
     }
     void DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
-        //
-        // OpenSSL пример использования:
-        //
 
         if (!inStream.good()) {
             throw std::runtime_error("Ошибка входного потока");
@@ -116,8 +107,6 @@ public:
         std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
 
         std::print("Входные данные: {}", input);
-
-        OpenSSL_add_all_algorithms();
 
         auto params = CreateChiperParamsFromPassword(password);
         params.encrypt = 0;
@@ -153,14 +142,13 @@ public:
 
         outStream << output;
 
-        std::print("String encoded successfully. Result: '{}'\n\n", output);
-        EVP_cleanup();
+        std::print("String decoded successfully. Result: '{}'\n\n", output);
     }
     std::string CalculateChecksum(std::iostream &inStream) {}
 };
 
-CryptoGuardCtx::CryptoGuardCtx() {}
-CryptoGuardCtx::~CryptoGuardCtx() {}
+CryptoGuardCtx::CryptoGuardCtx() { OpenSSL_add_all_algorithms(); }
+CryptoGuardCtx::~CryptoGuardCtx() { EVP_cleanup(); }
 
 // API
 void CryptoGuardCtx::EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
