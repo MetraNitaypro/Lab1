@@ -1,15 +1,13 @@
 #include "crypto_guard_ctx.h"
-#include <memory>
-#include <vector>
-
 #include <algorithm>
 #include <array>
-#include <fstream>
 #include <iostream>
+#include <memory>
 #include <openssl/evp.h>
 #include <print>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace CryptoGuard {
 
@@ -43,6 +41,11 @@ private:
 public:
     Impl() {}
     ~Impl() {}
+    void TrimTrailingZeros(std::string &s) {
+        while (!s.empty() && s.back() == '\0') {
+            s.pop_back();
+        }
+    }
     void EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
 
         if (!inStream.good()) {
@@ -144,6 +147,8 @@ public:
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
+
+        TrimTrailingZeros(output);
 
         outStream << output;
 
