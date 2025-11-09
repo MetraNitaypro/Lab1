@@ -1,4 +1,5 @@
 #include "crypto_guard_ctx.h"
+#include <memory>
 #include <vector>
 
 #include <algorithm>
@@ -55,39 +56,41 @@ public:
         // Чтение всех данных из inStream
         std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
 
-        std::print("Входные данные: {}", input);
+        std::print("Входные данные: {}\n", input);
 
         auto params = CreateChiperParamsFromPassword(password);
         params.encrypt = 1;
-        auto *ctx = EVP_CIPHER_CTX_new();
+
+        using UniquePtr =
+            std::unique_ptr<EVP_CIPHER_CTX, decltype([](EVP_CIPHER_CTX *ctx) { EVP_CIPHER_CTX_free(ctx); })>;
+
+        UniquePtr ctx{EVP_CIPHER_CTX_new()};
 
         // Инициализируем cipher
-        EVP_CipherInit_ex(ctx, params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
+        EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
 
         std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
         std::vector<unsigned char> inBuf(16);
         int outLen;
         // Обрабатываем первые N символов
         std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
-        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
+        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
 
         // Обрабатываем оставшиеся символы
         std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
-        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
+        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
 
         // Заканчиваем работу с cipher
-        EVP_CipherFinal_ex(ctx, outBuf.data(), &outLen);
+        EVP_CipherFinal_ex(ctx.get(), outBuf.data(), &outLen);
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
-
-        EVP_CIPHER_CTX_free(ctx);
 
         outStream << output;
 
@@ -106,39 +109,41 @@ public:
         // Чтение всех данных из inStream
         std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
 
-        std::print("Входные данные: {}", input);
+        std::print("Входные данные: {}\n", input);
 
         auto params = CreateChiperParamsFromPassword(password);
         params.encrypt = 0;
-        auto *ctx = EVP_CIPHER_CTX_new();
+
+        using UniquePtr =
+            std::unique_ptr<EVP_CIPHER_CTX, decltype([](EVP_CIPHER_CTX *ctx) { EVP_CIPHER_CTX_free(ctx); })>;
+
+        UniquePtr ctx{EVP_CIPHER_CTX_new()};
 
         // Инициализируем cipher
-        EVP_CipherInit_ex(ctx, params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
+        EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
 
         std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
         std::vector<unsigned char> inBuf(16);
         int outLen;
         // Обрабатываем первые N символов
         std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
-        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
+        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
 
         // Обрабатываем оставшиеся символы
         std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
-        EVP_CipherUpdate(ctx, outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
+        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
 
         // Заканчиваем работу с cipher
-        EVP_CipherFinal_ex(ctx, outBuf.data(), &outLen);
+        EVP_CipherFinal_ex(ctx.get(), outBuf.data(), &outLen);
         for (int i = 0; i < outLen; ++i) {
             output.push_back(outBuf[i]);
         }
-
-        EVP_CIPHER_CTX_free(ctx);
 
         outStream << output;
 
