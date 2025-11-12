@@ -86,12 +86,14 @@ public:
         std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
         EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
         for (int i = 0; i < outLen; ++i) {
+            std::print("i {} outBuf1 {}", i, outBuf[i]);
             output.push_back(outBuf[i]);
         }
 
         // Заканчиваем работу с cipher
         EVP_CipherFinal_ex(ctx.get(), outBuf.data(), &outLen);
         for (int i = 0; i < outLen; ++i) {
+            std::print("i {} outBuf2 {}", i, outBuf[i]);
             output.push_back(outBuf[i]);
         }
 
