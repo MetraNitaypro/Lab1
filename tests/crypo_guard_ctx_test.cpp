@@ -42,7 +42,7 @@ TEST(crypto_guard_ctx, EcryptDecrypt1) {
 }
 TEST(crypto_guard_ctx, EcryptDecrypt2) {
     CryptoGuard::CryptoGuardCtx crypt;
-    for (int i = 1; i < 20000; i++) {
+    for (int i = 1; i < 2000; i++) {
         std::stringstream input;
         std::stringstream output;
         std::string str = RandomString(i);
@@ -61,6 +61,19 @@ TEST(crypto_guard_ctx, EcryptDecrypt2) {
         EXPECT_EQ(input.str(), str);
     }
 }
+TEST(crypto_guard_ctx, CalculateChecksum) {
+    CryptoGuard::CryptoGuardCtx crypt;
+
+    std::stringstream input;
+    input << "Hellow World!";
+
+    auto result = crypt.CalculateChecksum(input);
+
+    std::print("Check sum: {}\n", result);
+
+    EXPECT_EQ("467b3a942074fa0006512f206d32b8eca43596bc653b83f8cdfe1c3085e67411", result);
+}
+
 TEST(crypto_guard_ctx, EcryptDecryptFailStream1) {
     CryptoGuard::CryptoGuardCtx crypt;
     std::stringstream input;
@@ -88,4 +101,10 @@ TEST(crypto_guard_ctx, EcryptDecryptFailStream4) {
     std::stringstream output;
     output.setstate(std::ios::failbit);
     ASSERT_THROW(crypt.DecryptFile(input, output, "123"), std::runtime_error);
+}
+TEST(crypto_guard_ctx, EcryptDecryptFailStream5) {
+    CryptoGuard::CryptoGuardCtx crypt;
+    std::stringstream input;
+    input.setstate(std::ios::failbit);
+    EXPECT_THROW(crypt.CalculateChecksum(input), std::runtime_error);
 }

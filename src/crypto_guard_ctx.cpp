@@ -1,11 +1,13 @@
 #include "crypto_guard_ctx.h"
-#include <algorithm>
 #include <array>
+#include <iomanip>
+#include <ios>
 #include <iostream>
 #include <iterator>
 #include <memory>
 #include <openssl/evp.h>
 #include <print>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -65,6 +67,10 @@ public:
 
         UniquePtr ctx{EVP_CIPHER_CTX_new()};
 
+        if (!ctx) {
+            throw std::runtime_error("Не удалось создать EVP_MD_CTX");
+        }
+
         std::vector<unsigned char> outBuf(input.size() + EVP_MAX_BLOCK_LENGTH);
 
         // Инициализируем cipher
@@ -115,6 +121,10 @@ public:
 
         UniquePtr ctx{EVP_CIPHER_CTX_new()};
 
+        if (!ctx) {
+            throw std::runtime_error("Не удалось создать EVP_MD_CTX");
+        }
+
         // Инициализируем cipher
         if (!EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(),
                                params.encrypt)) {
@@ -143,7 +153,51 @@ public:
         std::print("String decoded successfully. Result size: '{}'\n\n", output.size());
     }
 
-    std::string CalculateChecksum(std::iostream &inStream) {}
+    std::string CalculateChecksum(std::iostream &inStream) {
+
+        if (!inStream.good()) {
+            throw std::runtime_error("Ошибка входного потока");
+        }
+        std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
+
+        const EVP_MD *md;
+        unsigned char md_value[EVP_MAX_MD_SIZE];
+        unsigned int md_len = 0;
+
+        md = EVP_get_digestbyname("sha256");
+        if (!md) {
+            throw std::runtime_error("Не найдена функция sha256");
+        }
+
+        using UniquePtr = std::unique_ptr<EVP_MD_CTX, decltype([](EVP_MD_CTX *ctx) { EVP_MD_CTX_free(ctx); })>;
+
+        UniquePtr ctx{EVP_MD_CTX_new()};
+
+        if (!ctx) {
+            throw std::runtime_error("Не удалось создать контекст");
+        }
+
+        if (!EVP_DigestInit_ex2(ctx.get(), md, NULL)) {
+            throw std::runtime_error("Message digest initialization failed.");
+        }
+
+        if (!EVP_DigestUpdate(ctx.get(), input.data(), input.size())) {
+            throw std::runtime_error("Message digest update failed.");
+        }
+
+        if (!EVP_DigestFinal_ex(ctx.get(), md_value, &md_len)) {
+            throw std::runtime_error("Message digest finalization failed.");
+        }
+
+        std::stringstream ss;
+        ss << std::hex << std::setfill('0');  // hex + нули
+
+        for (unsigned int i = 0; i < md_len; ++i) {
+            ss << std::setw(2) << static_cast<int>(md_value[i]);
+        }
+
+        return ss.str();
+    }
 };
 
 CryptoGuardCtx::CryptoGuardCtx() { OpenSSL_add_all_algorithms(); }
