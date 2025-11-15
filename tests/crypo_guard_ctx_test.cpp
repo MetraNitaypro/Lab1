@@ -45,7 +45,7 @@ TEST(crypto_guard_ctx, EcryptDecrypt2) {
     for (int i = 1; i < 20000; i++) {
         std::stringstream input;
         std::stringstream output;
-        std::string str = RandomString(16);
+        std::string str = RandomString(i);
         input << str;
         std::print("Входные данные: {}\n", input.str());
 

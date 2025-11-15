@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <openssl/evp.h>
 #include <print>
@@ -41,11 +42,7 @@ private:
 public:
     Impl() {}
     ~Impl() {}
-    void TrimTrailingZeros(std::string &s) {
-        while (!s.empty() && s.back() == '\0') {
-            s.pop_back();
-        }
-    }
+
     void EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
 
         if (!inStream.good()) {
@@ -55,7 +52,6 @@ public:
             throw std::runtime_error("Ошибка выходного потока");
         }
 
-        std::string output;
         // Чтение всех данных из inStream
         std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
 
@@ -69,38 +65,34 @@ public:
 
         UniquePtr ctx{EVP_CIPHER_CTX_new()};
 
-        // Инициализируем cipher
-        EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
+        std::vector<unsigned char> outBuf(input.size() + EVP_MAX_BLOCK_LENGTH);
 
-        std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
-        std::vector<unsigned char> inBuf(16);
-        int outLen;
-        // Обрабатываем первые N символов
-        std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
-        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
+        // Инициализируем cipher
+        if (!EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(),
+                               params.encrypt)) {
+            throw std::runtime_error("Ошибка инициализации шифра");
         }
 
-        // Обрабатываем оставшиеся символы
-        std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
-        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
-        for (int i = 0; i < outLen; ++i) {
-            std::print("i {} outBuf1 {}", i, outBuf[i]);
-            output.push_back(outBuf[i]);
+        int outLen1 = 0;
+        int outLen2 = 0;
+
+        if (!EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen1, reinterpret_cast<const unsigned char *>(input.data()),
+                              input.size())) {
+            throw std::runtime_error("Ошибка Update (данные повреждены?)");
         }
 
         // Заканчиваем работу с cipher
-        EVP_CipherFinal_ex(ctx.get(), outBuf.data(), &outLen);
-        for (int i = 0; i < outLen; ++i) {
-            std::print("i {} outBuf2 {}", i, outBuf[i]);
-            output.push_back(outBuf[i]);
+        if (!EVP_CipherFinal_ex(ctx.get(), std::next(outBuf.data(), outLen1), &outLen2)) {
+            throw std::runtime_error("Ошибка Final (неверный ключ или повреждённый padding)");
         }
+
+        std::string output(reinterpret_cast<char *>(outBuf.data()), outLen1 + outLen2);
 
         outStream << output;
 
-        std::print("String encoded successfully. Result: '{}'\n\n", output);
+        std::print("String encoded successfully. Result size: '{}'\n\n", output.size());
     }
+
     void DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
 
         if (!inStream.good()) {
@@ -110,7 +102,6 @@ public:
             throw std::runtime_error("Ошибка выходного потока");
         }
 
-        std::string output;
         // Чтение всех данных из inStream
         std::string input((std::istreambuf_iterator<char>(inStream)), std::istreambuf_iterator<char>());
 
@@ -125,37 +116,33 @@ public:
         UniquePtr ctx{EVP_CIPHER_CTX_new()};
 
         // Инициализируем cipher
-        EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(), params.encrypt);
-
-        std::vector<unsigned char> outBuf(16 + EVP_MAX_BLOCK_LENGTH);
-        std::vector<unsigned char> inBuf(16);
-        int outLen;
-        // Обрабатываем первые N символов
-        std::copy(input.begin(), std::next(input.begin(), 16), inBuf.begin());
-        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(16));
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
+        if (!EVP_CipherInit_ex(ctx.get(), params.cipher, nullptr, params.key.data(), params.iv.data(),
+                               params.encrypt)) {
+            throw std::runtime_error("Ошибка инициализации шифра");
         }
 
-        // Обрабатываем оставшиеся символы
-        std::copy(std::next(input.begin(), 16), input.end(), inBuf.begin());
-        EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen, inBuf.data(), static_cast<int>(input.size() - 16));
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
+        std::vector<unsigned char> outBuf(input.size() + EVP_MAX_BLOCK_LENGTH);
+
+        int outLen1 = 0;
+        int outLen2 = 0;
+
+        if (!EVP_CipherUpdate(ctx.get(), outBuf.data(), &outLen1, reinterpret_cast<const unsigned char *>(input.data()),
+                              input.size())) {
+            throw std::runtime_error("Ошибка Update (данные повреждены?)");
         }
 
         // Заканчиваем работу с cipher
-        EVP_CipherFinal_ex(ctx.get(), outBuf.data(), &outLen);
-        for (int i = 0; i < outLen; ++i) {
-            output.push_back(outBuf[i]);
+        if (!EVP_CipherFinal_ex(ctx.get(), std::next(outBuf.data(), outLen1), &outLen2)) {
+            throw std::runtime_error("Ошибка Final (неверный ключ или повреждённый padding)");
         }
 
-        TrimTrailingZeros(output);
+        std::string output(reinterpret_cast<char *>(outBuf.data()), outLen1 + outLen2);
 
         outStream << output;
 
-        std::print("String decoded successfully. Result: '{}'\n\n", output);
+        std::print("String decoded successfully. Result size: '{}'\n\n", output.size());
     }
+
     std::string CalculateChecksum(std::iostream &inStream) {}
 };
 
@@ -166,6 +153,7 @@ CryptoGuardCtx::~CryptoGuardCtx() { EVP_cleanup(); }
 void CryptoGuardCtx::EncryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
     pImpl_->EncryptFile(inStream, outStream, password);
 }
+
 void CryptoGuardCtx::DecryptFile(std::iostream &inStream, std::iostream &outStream, std::string_view password) {
     pImpl_->DecryptFile(inStream, outStream, password);
 }
